@@ -143,6 +143,9 @@ void setup()
         pwm.setPWM(i, 0, SERVOFULLCLOSE);
     }
     // wait for them to get there
+
+    currentTick = millis();
+    
     delay(5000);
 }
 
