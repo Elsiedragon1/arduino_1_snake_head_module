@@ -17,15 +17,12 @@
   BSD license, all text above must be included in any redistribution
  ****************************************************/
 
-// SNAKE 1 Top jaw = 2 (pin 1) Bottom jaw = 1 (pin 0) Relay number 5 YELLOW
-// SNAKE 2 Top jaw = 4 (pin 3) Bottom jaw = 3 (pin 2) Relay number 6 BLUE
-// SNAKE 3 Top jaw = 6 (pin 5) Bottom jaw = 5 (pin 4) Relay number 7 GREEN
-// SNAKE 4 Top jaw = 8 (pin 7) Bottom jaw = 7 (pin 6) Relay number 8 RED
-
-//Flame relays = Snake 1 = 5
-//Flame relays = Snake 2 = 6
-//Flame relays = Snake 3 = 7
-//Flame relays = Snake 4 = 8
+// Pin assignments
+//              bottom_jaw  flames      tongues
+// Snake 1      0           13          9
+// Snake 2      2           14          10
+// Snake 3      4           15          11
+// Snake 4      6           16          12
 
 uint16_t bottom_jaw_1 = 0;
 uint16_t bottom_jaw_2 = 2;
@@ -49,7 +46,7 @@ const uint16_t bufferSize = 256;
 const uint8_t dePin = 17;
 
 //  Modbus data structures
-const uint8_t coils = 4;
+const uint8_t coils = 5; // Flamethrowers + 1
 
 uint32_t flameStartTick[coils] = { 0 };
 
