@@ -18,20 +18,20 @@
  ****************************************************/
 
 // Pin assignments
-//              bottom_jaw  flames      tongues
+//              bottom_jaw  tongues  flames
 // Snake 1      0           13          9
 // Snake 2      2           14          10
 // Snake 3      4           15          11
 // Snake 4      6           16          12
 
+#include <Wire.h>
+#include <Adafruit_PWMServoDriver.h>
+#include <ModbusRTUSlave.h>
+
 uint16_t bottom_jaw_1 = 0;
 uint16_t bottom_jaw_2 = 2;
 uint16_t bottom_jaw_3 = 4;
 uint16_t bottom_jaw_4 = 6;
-
-#include <Wire.h>
-#include <Adafruit_PWMServoDriver.h>
-#include <ModbusRTUSlave.h>
 
 // Timing
 uint32_t currentTick = 0;
@@ -381,21 +381,21 @@ void updateFlamethrowers()
                 //  LED OFF!
                 if (LowOn)
                 {
-                    digitalWrite(13+n, HIGH);
+                    digitalWrite(9+n, HIGH);
                 } 
                 else
                 {
-                    digitalWrite(13+n, LOW);
+                    digitalWrite(9+n, LOW);
                 }
             } else {
                 //  LED ON!
                 if (LowOn)
                 {
-                    digitalWrite(13+n, LOW);
+                    digitalWrite(9+n, LOW);
                 }
                 else
                 {
-                    digitalWrite(13+n, HIGH);
+                    digitalWrite(9+n, HIGH);
                 }
             }
         }
