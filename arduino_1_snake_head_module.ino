@@ -73,16 +73,16 @@ bool coilWrite(uint16_t address, bool data)
     return false;
 }
 
-// called this way, it uses the default address 0x40
+// Called this way, it uses the default address 0x40
 Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver(0x40);
-//Need to setup the second pwm board with address 0x41 (this board has A0 jumper bridged)
+// Need to setup the second pwm board with address 0x41 (this board has A0 jumper bridged)
 Adafruit_PWMServoDriver pwm2 = Adafruit_PWMServoDriver(0x41);
 
-// find these values from running servo-max-min-finder
+// Find these values from running servo-max-min-finder
 #define SERVOFULLOPEN  185
 #define SERVOFULLCLOSE  590
 
-// initialise arrays of size 8 (one value for each servo)
+// Initialise arrays of size 8 (one value for each servo)
 uint16_t random_open_vals[8];
 uint16_t random_closed_vals[8];
 
@@ -303,7 +303,6 @@ void tongue_out_in(bool sync, bool relay_num[])
     }
 }
 
-
 //A function for the leds (snake eye wave)
 void eyesofled()
 {
@@ -318,6 +317,7 @@ void eyesofled()
 }
 
 //A function to randomly light pairs of leds (this could be better)
+/*
 void randomeyes()
 {
     for (int i = 0; i < 7; i++)
@@ -337,25 +337,78 @@ void randomeyes()
         }
     }
 }
+*/
 
-//  A function to trigger the flame relays
-//  Depreciated if other flamethrower settings work!
-void flamerelays()
+//  SNAKE MODES!
+//  0 This will eventually be standby mode. This is the mode when the medusa is 
+uint8_t mode = 0;
+
+//  Non-blocking eye LED code
+//  Only 4 values as eyes are always paired!
+//  Leds are given a PWM value of between 0 and 4096
+
+// Sync led maximum value to flamethrowers?
+uint32_t eyeStartTick[4] = { 0, 0, 0, 0 };
+uint16_t eyeValue[4] = { 0 };
+uint16_t eyeDuration[4] = { 1, 1, 1, 1 };
+
+uint32_t eyeTick = 0;
+uint32_t eyeInterval = 1000/30;   // 30 fps
+
+void randomEyes()
 {
-    for (int i = 0; i <= 3; i++)
+    for (uint8_t n = 0; n < 4; n++)
     {
-        digitalWrite(flamesequence[i], LOW);
-        delay(500); //flame on for this long
-        digitalWrite(flamesequence[i], HIGH);
-        Serial.println(i);
+        float progress = float(currentTick - eyeStartTick[n]) / float(eyeDuration[n]);
+
+        if (progress >= 1.0)
+        {
+            //  Set new value for eyeValue
+            eyeValue[n] = random(2048, 4096);
+            progress = 0.0;
+            eyeStartTick[n] = currentTick;
+            eyeDuration[n] = eyeValue[n] / 2;  // Scale duration according to intensity
+        }
+
+        uint16_t eyeIntensity = eyeValue[n] * (1.0-progress);
+
+        pwm2.setPWM(2*n, 0, eyeIntensity);
+        pwm2.setPWM((2*n)+1, 0, eyeIntensity);
     }
-    //Then do a random sequence
-    for (int i = 0; i <= 3; i++)
+}
+
+void syncedEyes() {
+    //  Use eyeValue[0] for calculations for all eyes!
+
+    float progress = float(currentTick - eyeStartTick[0]) / float(eyeDuration[0]);
+
+    if (progress >= 1.0)
     {
-        randNumber = random(4);
-        digitalWrite(flamesequence[randNumber], LOW);
-        delay(500); //flame on for this long
-        digitalWrite(flamesequence[randNumber], HIGH);
+        //  Set new value for eyeValue
+        eyeValue[0] = random(2048, 4096);
+        progress = 0.0;
+        eyeStartTick[0] = currentTick;
+        eyeDuration[0] = eyeValue[0] / 2;  //  Scale duration according to intensity
+    }
+
+    uint16_t eyeIntensity = eyeValue[0] * (1.0-progress);
+
+    for (uint8_t n = 0; n < 4; n++)
+    {
+        pwm2.setPWM(2*n, 0, eyeIntensity);
+        pwm2.setPWM((2*n)+1, 0, eyeIntensity);
+    }
+}
+
+void updateEyes()
+{
+    if (currentTick - eyeTick >= eyeInterval)
+    {   
+        // Deal with switching between random and synced eyes here!
+        randomEyes();
+        // syncedEyes();
+
+        eyeTick = currentTick;
     }
 }
 
@@ -399,6 +452,7 @@ void updateFlamethrowers()
                 }
             }
         }
+        lastFlamethrowerTick = currentTick;
     }
 }
 
@@ -406,6 +460,7 @@ void loop()
 {
     currentTick = millis();
     updateFlamethrowers();
+    updateEyes();
     modbus.poll();
 
     /*
