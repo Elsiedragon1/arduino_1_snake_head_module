@@ -344,14 +344,20 @@ void mouthAnimate()
                     if ( currentTick - mouthStartTick[n] > mouthDelay[n])
                     {
                         //  Mouth is open now!
+
                         //  Insert code to check for sticking out tongue here
-                        //  if mouth open enough
-                        //      mouthState[n] = 4;
-                        //  else
+                        //if ( mouthTarget[n] < ((SERVOFULLCLOSE + SERVOFULLOPEN) / 2) )
+                        //{
+                        //    mouthState[n] = 4; // Stick out tongue!
+                        //    mouthDelay = 1000; // Keep tongue out for 1 second!
+                        //    mouthStartTick[n] = currentTick;
+                        //    digitalWrite(9+n, LOW); // Actually stick out the tongue!
+                        //} else {
                         mouthState[n] = 2;
                         mouthDelay[n] = random(500, 1000);  // Duration to wait with mouth open!
                         mouthStartTick[n] = currentTick;
                         //  No position updates!
+                        //}
 
                     }
                     // else { wait ... }
@@ -376,15 +382,25 @@ void mouthAnimate()
                     if ( currentTick - mouthStartTick[n] > mouthDelay[n])
                     {
                         //  Mouth is mouth is closed now!
-                        mouthState[n] = 1;
+                        mouthState[n] = 0;
                         mouthDelay[n] = random(1000, 3000);  // Duration to wait with mouth open!
                         mouthStartTick[n] = currentTick;
                         // No position updates!
                     }
                     break;
                 case 4:
-                    break;
-                case 5:
+                //  STICKING TONGUE OUT!
+                    if ( currentTick - mouthStartTick[n] > mouthDelay[n])
+                    {
+                        //  Pull back in tongue!
+                        digitalWrite(9+n, HIGH);
+
+                        // Switch state to closing the mouth
+                        mouthState[n] = 2;
+                        mouthDelay[n] = 1000;  // Duration to wait for tongue to go back in and for the mouth to close
+                        mouthStartTick[n] = currentTick;
+                        // No position updates!
+                    }
                     break;
                 case default:
                     break;
