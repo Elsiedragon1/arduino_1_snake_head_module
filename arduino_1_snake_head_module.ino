@@ -321,7 +321,7 @@ void mouthAnimate()
 {
     if (currentTick - mouthTick >= mouthInterval)
     {
-        for ( uint8_t n = 0; n < 4; n++)
+        for ( uint8_t n = 0; n < 4; n++ )
         {
             switch (mouthState[n])
             {
@@ -375,7 +375,7 @@ void mouthAnimate()
                         mouthDelay[n] = 2000;  // Duration to wait with mouth open!
                         mouthStartTick[n] = currentTick;
                         mouthTarget[n] = random(SERVOFULLCLOSE-10, SERVOFULLCLOSE);
-                        servoPWM.setPWM((2*n), 0, random(SERVOFULLCLOSE-10, SERVOFULLCLOSE);
+                        servoPWM.setPWM((2*n), 0, random(SERVOFULLCLOSE-10, SERVOFULLCLOSE));
                         servoPWM.setPWM((2*n)+1, 0, mouthTarget[n]);
 
                     }
@@ -410,6 +410,38 @@ void mouthAnimate()
                     break;
             }
         }
+        mouthTick = currentTick;
+    }
+}
+
+void mouthClose()
+{
+    if (currentTick - mouthTick >= mouthInterval)
+    {
+        for ( uint8_t n = 0; n < 4; n++ )
+        {
+            switch (mouthState[n])
+            {
+                case 0:
+                    break;
+
+                case 1:
+                    break;
+
+                case 2:
+                    break;
+
+                case 3:
+                    break;
+
+                case 4:
+                    break;
+
+                default:
+                    break;
+            }
+        }
+        
         mouthTick = currentTick;
     }
 }
