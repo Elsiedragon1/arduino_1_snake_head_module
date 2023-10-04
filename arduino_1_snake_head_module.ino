@@ -74,7 +74,7 @@ bool coilWrite(uint16_t address, bool data)
 }
 
 // Called this way, it uses the default address 0x40
-Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver(0x40);
+Adafruit_PWMServoDriver servoPWM = Adafruit_PWMServoDriver(0x40);
 // Need to setup the second pwm board with address 0x41 (this board has A0 jumper bridged)
 Adafruit_PWMServoDriver eyePWM = Adafruit_PWMServoDriver(0x41);
 
@@ -124,8 +124,8 @@ void setup()
         digitalWrite(i, HIGH);
     }
 
-    pwm.begin();
-    pwm.setPWMFreq(60);
+    servoPWM.begin();
+    servoPWM.setPWMFreq(60);
 
     eyePWM.begin();
     eyePWM.setPWMFreq(1600);  // This is the maximum PWM frequency
@@ -137,7 +137,7 @@ void setup()
 
     // when programme starts, set all 8 servos to minimum position
     for (int i = 0; i < 8; i++) {
-        pwm.setPWM(i, 0, SERVOFULLCLOSE);
+        servoPWM.setPWM(i, 0, SERVOFULLCLOSE);
     }
     // wait for them to get there
 
@@ -147,6 +147,7 @@ void setup()
 }
 
 // function which causes each jaw to open and close to a random position
+/*
 void random_mouths()
 {
     // fill an array of random numbers to open the mouth to (different one for each servo). Number is between min and max servo vals
@@ -224,13 +225,14 @@ void random_mouths()
     // waits for the servo to get there
     delay(800);
 }
+*/
 
 // function which makes all the jaws open and close synchronously
 void synchronous_mouths() {
     // set all of the jaws to the same random open position
     uint16_t random_open = random(SERVOFULLOPEN, SERVOFULLCLOSE);
     for (int i = 0; i < 8; i++) {
-        pwm.setPWM(i, 0, random_open);
+        servoPWM.setPWM(i, 0, random_open);
     }
 
     Serial.print("servos at position ");
@@ -250,7 +252,7 @@ void synchronous_mouths() {
     // Increase 10 to make the closed position more random
     uint16_t random_closed = random(SERVOFULLCLOSE - 10, SERVOFULLCLOSE);
     for (int i = 0; i < 8; i++) {
-        pwm.setPWM(i, 0, random_closed);
+        servoPWM.setPWM(i, 0, random_closed);
     }
     Serial.print("servos at position ");
     Serial.println(random_closed);
@@ -259,6 +261,7 @@ void synchronous_mouths() {
 }
 
 // function which makes the tongue stick out and come back in again
+/*
 void tongue_out_in(bool sync, bool relay_num[])
 { 
     // syncronised tonuges out
@@ -295,6 +298,7 @@ void tongue_out_in(bool sync, bool relay_num[])
         digitalWrite(i, HIGH);
     }
 }
+*/
 
 //  It is only necessary to know the position of the lower jaws!
 uint16_t mouthTarget[4] = { SERVOFULLCLOSE };
@@ -331,8 +335,8 @@ void mouthAnimate()
                         mouthDelay[n] = 2000;   //  Adjust to make sure this is low, but always works! This is a mechanical constraint!
                         mouthStartTick[n] = currentTick;
                         mouthTarget[n] = random(SERVOFULLOPEN, SERVOFULLCLOSE); //  This is keeping track of the bottom mouth
-                        pwm.setPWM((2*n), 0, random(SERVOFULLOPEN, SERVOFULLCLOSE););
-                        pwm.setPWM((2*n)+1, 0, mouthTarget[n]);
+                        servoPWM.setPWM((2*n), 0, random(SERVOFULLOPEN, SERVOFULLCLOSE));
+                        servoPWM.setPWM((2*n)+1, 0, mouthTarget[n]);
                     }
                     //else 
                     //{
@@ -371,8 +375,8 @@ void mouthAnimate()
                         mouthDelay[n] = 2000;  // Duration to wait with mouth open!
                         mouthStartTick[n] = currentTick;
                         mouthTarget[n] = random(SERVOFULLCLOSE-10, SERVOFULLCLOSE);
-                        pwm.setPWM((2*n), 0, random(SERVOFULLCLOSE-10, SERVOFULLCLOSE););
-                        pwm.setPWM((2*n)+1, 0, mouthTarget[n]);
+                        servoPWM.setPWM((2*n), 0, random(SERVOFULLCLOSE-10, SERVOFULLCLOSE);
+                        servoPWM.setPWM((2*n)+1, 0, mouthTarget[n]);
 
                     }
                     // else { wait ... }
@@ -402,7 +406,7 @@ void mouthAnimate()
                         // No position updates!
                     }
                     break;
-                case default:
+                default:
                     break;
             }
         }
