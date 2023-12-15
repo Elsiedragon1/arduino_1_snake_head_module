@@ -38,7 +38,7 @@ uint16_t bottom_jaw_4 = 6;
 uint32_t currentTick = 0;
 
 //  Modbus ID
-const uint16_t id = 3;
+const uint16_t id = 1;
 
 //  Modbus Serial configuration
 const uint32_t baud = 115200;
@@ -47,7 +47,7 @@ const uint16_t bufferSize = 256;
 const uint8_t dePin = 17;
 
 //  Modbus data structures
-const uint8_t coils = 7; // Flamethrowers + 1
+const uint8_t coils = 6; // Flamethrowers + 1
 
 //  Notes on coil addresses
 //  0:  Ignored!                //  This was the case for the saxaphone unit as an address 0 was used to denote no drum events.
@@ -57,12 +57,21 @@ const uint8_t coils = 7; // Flamethrowers + 1
 //  3:  Snake 2
 //  4:  Snake 3
 //  5:  Ignored!                //  This is the 5th flamethrower on the saxaphone unit ... keep it as ignored just in case. For now!
-//  6:  Enable/Disable mouths
+
+const uint8_t holdingRegisters = 3; //  Holding registers are read/write!
+uint16_t registers[holdingRegisters] = { 0 };
+
+//  Notes on holding register addresses
+//  0: Mode!
+//  1: Snake Eyes!  0=>Animated (Default) 1=> All On! 2=> All off! (?)
+//  2: Snake Mouths 0=>Animated (Default) 1=> All open! 2=> All closed! 3=> Tongues out!
 
 uint32_t flameStartTick[coils] = { 0 };
 
 //  Mouth state
 bool mouthsClosed = false;
+bool mouthsOpen = false;
+bool tonguesOut = false;
 
 uint8_t buffer[bufferSize];
 ModbusRTUSlave modbus(Serial1, buffer, bufferSize, dePin);
@@ -77,30 +86,6 @@ bool coilWrite(uint16_t address, bool data)
 {
     if (address <= coils && address > 0)    //   Should this be address < coils && address > 0?
     {
-        /*
-        if ( address <= 4 && address != 6)
-        {
-            if (data)
-            {   
-                flameStartTick[address-1] = currentTick;
-                return true;
-            }
-            return true;
-        }
-        if ( address == 6 )
-        {
-            if (data)
-            {
-                //  Turns snake mouths on!
-                mouthsClosed = false;
-            } else {
-                //  Turn snake mouths off!
-                mouthsClosed = true;
-            }
-            return true;
-        }
-        return false;
-        */
         switch( address )
         {
             case 1:
@@ -113,24 +98,35 @@ bool coilWrite(uint16_t address, bool data)
                     return true;
                 }
                 return true;
-            case 6:
-                if (data)
-                {
-                    //  Turns snake mouths on!
-                    mouthsClosed = false;
-                } else {
-                    //  Turn snake mouths off!
-                    mouthsClosed = true;
-                }
-                return true;
             default:
                 //  Non compatible addresses (address 5) should just be ignored for now
                 //  A more robust setup would respond with an invalid address error
-                //  But the controller doesn't handle this currently
+                //  But the controller doesn't do anything in particular with this currently
                 return true;
         }
     }
     return false;
+}
+
+int32_t readHoldingRegister(uint16_t address)
+{
+    if (address >= 0 && address < holdingRegisters)
+    {
+        return registers[address];
+    } 
+}
+
+int16_t writeHoldingRegister(uint16_t address, uint16_t data)
+{
+    if (address >= 0 && address < holdingRegisters)
+    {
+        registers[address] = data;
+        return true;
+    }
+    else
+    {
+        return false;
+    }
 }
 
 // Called this way, it uses the default address 0x40
@@ -152,18 +148,19 @@ int randNumber;
 void setup()
 {
     // initialise Serial
-    Serial.begin(9600);
+    Serial.begin(115200);   //  For debugging / serial output if necessary!
 
     // Initialise Modbus
     // Physical Modbus setup on the MEGA2560 should be as follows:
     //  DE PIN  ->  17
     //  TX      ->  18
     //  RX      ->  19
-    //  This leaves Serial free foor debugging if required!
+    //  This leaves Serial free for debugging if required!
 
     Serial1.begin(baud, config);
     modbus.begin(id, baud, config);
     modbus.configureCoils(coils, coilRead, coilWrite);
+    modbus.configureHoldingRegisters(holdingRegisters, readHoldingRegister, writeHoldingRegister);
 
     // RS485 Enable / Disable
     pinMode(17, OUTPUT);
@@ -364,24 +361,38 @@ void tongue_out_in(bool sync, bool relay_num[])
 
 
 
-//  It is only necessary to know the position of the lower jaws!
+//  It is only necessary to know the position of the lower jaws for the tongues!
 uint16_t mouthTarget[4] = { SERVOFULLCLOSE };
-//  Is it important to know the actual mouth target posittion at any point?
+//  Is it important to know the actual mouth target position at any point?
 uint8_t mouthState[4] = { 0 };
-uint32_t mouthDelay[4] = { 5000 };
-// 0 is closed!
-// 1 is opening
-// 2 is open!
-// 3 is closing"
-// 4 is sticking a tongue out!
-// 5 is done with sticking out its tongue!
+uint32_t mouthDelay[4] = { 5000, 5000, 5000, 5000 };
+bool mouthResetState[4] = { 0 };
+
+/*
+The mouth code requires waiting to get to known states so it is best to let the mouth animation code handle all the control.
+The two control schemes (for now) is either synchronous or asynchronous.
+Other specific behaviour is achieved by setting behaviour overrides.
+
+mouthsClosed - Lets the animation continue but stops it once fully closed!
+mouthsOpen - Lets the animation continue, but stops it once a mouth has been fully opened!
+*/
+
+//  Mouth State information
+//      0 is closed!
+//      1 is opening
+//      2 is open!
+//      3 is closing
+//      4 is sticking a tongue out!
+
 uint32_t mouthStartTick[4];
 
 uint32_t mouthTick = 0;
 uint32_t mouthInterval = 1000/10;
 
+bool mouthResetting = false;
+
 //  For now I am going to assume random, then we can worry about synchronised movements later!
-void mouthAnimate()
+void mouthAnimateIndependent()
 {
     if (currentTick - mouthTick >= mouthInterval)
     {
@@ -400,13 +411,22 @@ void mouthAnimate()
                             mouthState[n] = 1;
                             mouthDelay[n] = 2000;   //  Adjust to make sure this is low, but always works! This is a mechanical constraint!
                             mouthStartTick[n] = currentTick;
-                            mouthTarget[n] = random(SERVOFULLOPEN, SERVOFULLCLOSE); //  This is keeping track of the bottom mouth
-                            servoPWM.setPWM((2*n), 0, random(SERVOFULLOPEN, SERVOFULLCLOSE));
-                            servoPWM.setPWM((2*n)+1, 0, mouthTarget[n]);
+                            if ( mouthsOpen || tonguesOut )
+                            {
+                                mouthTarget[n] = SERVOFULLOPEN;
+                                servoPWM.setPWM((2*n), 0, mouthTarget[n]);
+                                servoPWM.setPWM((2*n)+1, 0, SERVOFULLOPEN);
+                            }
+                            else
+                            {
+                                mouthTarget[n] = random(SERVOFULLOPEN, SERVOFULLCLOSE); //  This is keeping track of the bottom mouth
+                                servoPWM.setPWM((2*n), 0, mouthTarget[n]);
+                                servoPWM.setPWM((2*n)+1, 0, random(SERVOFULLOPEN, SERVOFULLCLOSE));
+                            }
                         } else {
                             //  Keep mouths here
                             //  As soon as mouthsClosed is set to false, the mouths will all be set to open!
-                            ;
+                            mouthResetState[n] = true;
                         }
                     }
                     //else 
@@ -419,19 +439,27 @@ void mouthAnimate()
                     if ( currentTick - mouthStartTick[n] > mouthDelay[n])
                     {
                         //  Mouth is open now!
-
-                        //  Insert code to check for sticking out tongue here
-                        if ( mouthTarget[n] < ((SERVOFULLCLOSE + SERVOFULLOPEN) / 2) )
+                        if ( mouthsOpen == false )
                         {
-                            mouthState[n] = 4; // Stick out tongue!
-                            mouthDelay[n] = 1000; // Keep tongue out for 1 second!
-                            mouthStartTick[n] = currentTick;
-                            digitalWrite(13+n, LOW); // Actually stick out the tongue!
-                        } else {
-                        mouthState[n] = 2;
-                        mouthDelay[n] = random(500, 1000);  // Duration to wait with mouth open!
-                        mouthStartTick[n] = currentTick;
-                        //  No position updates!
+                            mouthResetState[n] = false;
+                            //  Insert code to check for sticking out tongue here
+                            if ( mouthTarget[n] < ((SERVOFULLCLOSE + SERVOFULLOPEN) / 2) )
+                            {
+                                mouthState[n] = 4; // Stick out tongue!
+                                mouthDelay[n] = 1000; // Keep tongue out for 1 second!
+                                mouthStartTick[n] = currentTick;
+                                digitalWrite(13+n, LOW); // Actually stick out the tongue!
+                            } else {
+                                mouthState[n] = 2;
+                                mouthDelay[n] = random(500, 1000);  // Duration to wait with mouth open!
+                                mouthStartTick[n] = currentTick;
+                            //  No position updates!
+                            }
+                        }
+                        else
+                        {
+                            //  Mouths will be held open here!
+                            mouthResetState[n] = true;
                         }
 
                     }
@@ -446,8 +474,8 @@ void mouthAnimate()
                         mouthDelay[n] = 2000;  // Duration to wait with mouth open!
                         mouthStartTick[n] = currentTick;
                         mouthTarget[n] = SERVOFULLCLOSE;
-                        servoPWM.setPWM((2*n), 0, SERVOFULLCLOSE);
-                        servoPWM.setPWM((2*n)+1, 0, mouthTarget[n]);
+                        servoPWM.setPWM((2*n), 0, mouthTarget[n]);
+                        servoPWM.setPWM((2*n)+1, 0, SERVOFULLCLOSE);
 
                     }
                     // else { wait ... }
@@ -456,25 +484,43 @@ void mouthAnimate()
                 //  CLOSING!
                     if ( currentTick - mouthStartTick[n] > mouthDelay[n])
                     {
-                        //  Mouth is mouth is closed now!
-                        mouthState[n] = 0;
-                        mouthDelay[n] = random(1000, 3000);  // Duration to wait with mouth open!
-                        mouthStartTick[n] = currentTick;
-                        // No position updates!
+                        if (mouthsClosed == false)
+                        {
+                            mouthResetState[n] = false;
+                            //  Mouth is closed now!
+                            mouthState[n] = 0;
+                            mouthDelay[n] = random(1000, 3000);  // Duration to wait with mouth open!
+                            mouthStartTick[n] = currentTick;
+                            // No position updates!
+                        }
+                        else
+                        {
+                            //  Mouths will be held closed here!
+                            mouthResetState[n] = true;
+                        }
                     }
                     break;
                 case 4:
                 //  STICKING TONGUE OUT!
                     if ( currentTick - mouthStartTick[n] > mouthDelay[n])
                     {
-                        //  Pull back in tongue!
-                        digitalWrite(13+n, HIGH);
+                        if (tonguesOut == false)
+                        {
+                            mouthResetState[n] = false;
+                            //  Pull back in tongue!
+                            digitalWrite(13+n, HIGH);
 
-                        // Switch state to closing the mouth
-                        mouthState[n] = 2;
-                        mouthDelay[n] = 1500;  // Duration to wait for tongue to go back in and for the mouth to close
-                        mouthStartTick[n] = currentTick;
-                        // No position updates!
+                            // Switch state to closing the mouth
+                            mouthState[n] = 2;
+                            mouthDelay[n] = 1500;  // Duration to wait for tongue to go back in and for the mouth to close
+                            mouthStartTick[n] = currentTick;
+                            // No position updates!
+                        }
+                        else
+                        {
+                            // Keep tongues stuck out here!
+                            mouthResetState[n] = true;
+                        }
                     }
                     break;
                 default:
@@ -483,6 +529,58 @@ void mouthAnimate()
         }
         mouthTick = currentTick;
     }
+}
+
+bool checkResetState()
+{
+    //  Check to see if the mouths are now all reset!
+    if (mouthResetState[0] == true && mouthResetState[0] == true && mouthResetState[0] == true && mouthResetState[0] == true)
+    {
+        // All mouths have reset!
+        return true;
+    }
+    return false;
+}
+
+uint16_t lastMouthState = 0;
+
+void updateMouths()
+{
+    //  2: Snake Mouths 0=>Animated (Default) 1=> All open! 2=> All closed!
+    uint16_t currentState = registers[2];
+    if ( currentState != lastMouthState)
+    {
+        switch(currentState)
+        {
+            case 0:
+                mouthsClosed = false;
+                mouthsOpen = false;
+                tonguesOut = false;
+                break;
+            case 1:
+                mouthsClosed = false;
+                mouthsOpen = true;
+                tonguesOut = false;
+                break;
+            case 2:
+                mouthsClosed = true;
+                mouthsOpen = false;
+                tonguesOut = false;
+                break;
+            case 3:
+                mouthsClosed = false;
+                mouthsOpen = false;
+                tonguesOut = true;
+                break;
+            default:
+                mouthsClosed = false;
+                mouthsOpen = false;
+                tonguesOut = false;
+                break;
+        }
+        lastMouthState = currentState;
+    }
+    mouthAnimateIndependent();
 }
 
 
@@ -534,7 +632,7 @@ void randomeyes()
 */
 
 //  SNAKE MODES!
-//  0 This will eventually be standby mode. This is the mode when the medusa is 
+//  0 This will eventually be standby mode. This is the mode when the medusa is not active!
 uint8_t mode = 0;
 
 //  Non-blocking eye LED code
@@ -548,6 +646,24 @@ uint16_t eyeDuration[4] = { 1, 1, 1, 1 };
 
 uint32_t eyeTick = 0;
 uint32_t eyeInterval = 1000/30;   // 30 fps
+
+void onEyes()
+{
+    for (uint8_t n = 0; n < 4; n++)
+    {
+        eyePWM.setPWM(2*n, 0, 4095);
+        eyePWM.setPWM((2*n)+1, 0, 4095);
+    }
+}
+
+void offEyes()
+{
+    for (uint8_t n = 0; n < 4; n++)
+    {
+        eyePWM.setPWM(2*n, 0, 0);
+        eyePWM.setPWM((2*n)+1, 0, 0);
+    }
+}
 
 void randomEyes()
 {
@@ -599,8 +715,23 @@ void updateEyes()
     if (currentTick - eyeTick >= eyeInterval)
     {   
         // Deal with switching between random and synced eyes here!
-        randomEyes();
-        // syncedEyes();
+        switch (registers[1])
+        {
+            case 0:
+                randomEyes();
+                break;
+            case 1:
+                onEyes();
+                break;
+            case 2:
+                offEyes();
+                break;
+            default:
+                randomEyes();
+                break;
+        }
+        
+        // syncedEyes() ?
 
         eyeTick = currentTick;
     }
@@ -655,29 +786,6 @@ void loop()
     currentTick = millis();
     updateFlamethrowers();
     updateEyes();
-    //  mouthAnimate();
+    updateMouths();
     modbus.poll();
-
-    /*
-    // choose the number of times the random function is called
-    uint16_t how_many_random = 6;
-    // choose the number of times the synchronous function is called
-    uint16_t how_many_sync = 4;
-
-    // call random function
-    Serial.println("random");
-    for (int i = 0; i < how_many_random; i++) {
-        random_mouths();
-        eyesofled();
-        flamerelays();
-    }
-    Serial.println("synchronous");
-    // call synchronous function
-    for (int i = 0; i < how_many_sync; i++) {
-        synchronous_mouths();
-        randomeyes();
-        flamerelays();
-    }
-    Serial.println();
-    */
 }
