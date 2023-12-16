@@ -59,10 +59,10 @@ const uint8_t coils = 6; // Flamethrowers + 1
 //  5:  Ignored!                //  This is the 5th flamethrower on the saxaphone unit ... keep it as ignored just in case. For now!
 
 const uint8_t holdingRegisters = 3; //  Holding registers are read/write!
-uint16_t registers[holdingRegisters] = { 0 };
+uint16_t registers[holdingRegisters] = { 0, 2, 2 };
 
 //  Notes on holding register addresses
-//  0: Mode!
+//  0: Mode! 0=> Off ... awaiting activation! 1 => On!
 //  1: Snake Eyes!  0=>Animated (Default) 1=> All On! 2=> All off! (?)
 //  2: Snake Mouths 0=>Animated (Default) 1=> All open! 2=> All closed! 3=> Tongues out!
 
@@ -358,8 +358,6 @@ void tongue_out_in(bool sync, bool relay_num[])
     }
 }
 */
-
-
 
 //  It is only necessary to know the position of the lower jaws for the tongues!
 uint16_t mouthTarget[4] = { SERVOFULLCLOSE };
@@ -781,10 +779,46 @@ void updateFlamethrowers()
     }
 }
 
+uint32_t lastUpdateTick = 0;
+uint32_t updateInterval = 1000/30;
+
+uint16_t lastMode = 0;
+
+void updateSnakes()
+{
+    if (currentTick - lastUpdateTick >= updateInterval)
+    {
+        uint16_t newMode = registers[0];
+        if (newMode != lastMode)
+        {
+            switch(newMode)
+            {
+              //  Edit registers and let the eyes and mouths handle themselves!
+              case 0:
+                  registers[1] = 2;
+                  registers[2] = 2;
+                  break;
+              case 1:
+                  registers[1] = 0; //  0 = Animated, 1 = On!, 2 = Off!
+                  registers[2] = 0; //  0 = Animated
+                  break;
+              default:
+                  registers[1] = 2;
+                  registers[2] = 2;
+                  break;
+                break;
+            }
+            lastMode = newMode;
+        }
+        lastUpdateTick = currentTick;
+    }
+}
+
 void loop()
 {
     currentTick = millis();
     updateFlamethrowers();
+    updateSnakes();
     updateEyes();
     updateMouths();
     modbus.poll();
