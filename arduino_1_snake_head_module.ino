@@ -163,7 +163,7 @@ void setup()
     modbus.configureHoldingRegisters(holdingRegisters, readHoldingRegister, writeHoldingRegister);
 
     // RS485 Enable / Disable
-    pinMode(17, OUTPUT);
+    pinMode(dePin, OUTPUT);
 
     // initialise relay pins for the tongues
     // I've changed this to initialise the flame pins too
