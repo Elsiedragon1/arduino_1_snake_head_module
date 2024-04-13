@@ -56,7 +56,7 @@ const uint8_t coils = 6; // Flamethrowers + 1
 //  2:  Snake 1
 //  3:  Snake 2
 //  4:  Snake 3
-//  5:  Ignored!                //  This is the 5th flamethrower on the saxaphone unit ... keep it as ignored just in case. For now!
+//  5:  Chase!                  //  This is the 5th flamethrower on the saxaphone unit ... keep it as ignored just in case. For now!
 
 const uint8_t holdingRegisters = 3; //  Holding registers are read/write!
 uint16_t registers[holdingRegisters] = { 0, 2, 2 };
@@ -82,30 +82,50 @@ int8_t coilRead(uint16_t address)
     return false;
 }
 
+// Chase!
+uint8_t chaseItems = 4;
+uint32_t chaseDuration = 300;
+uint32_t lastChaseTick = 0;
+uint32_t chaseInterval = 1000/60;
+uint8_t chasePosition = 0;
+bool chase = false;
+
 bool coilWrite(uint16_t address, bool data)
 {
     if (address <= coils && address > 0)    //   Should this be address < coils && address > 0?
     {
-        switch( address )
-        {
-            case 1:
-            case 2:
-            case 3:
-            case 4:
-                if (data)
-                {   
-                    flameStartTick[address-1] = currentTick;
-                    return true;
-                }
-                return true;
-            default:
-                //  Non compatible addresses (address 5) should just be ignored for now
-                //  A more robust setup would respond with an invalid address error
-                //  But the controller doesn't do anything in particular with this currently
-                return true;
+        if (data)
+        {   
+            flameStartTick[address-1] = currentTick;
+            if (address == 5)
+            {
+                // Chase!
+                chase = true;
+                chasePosition = 0;
+            }
+            return true;
         }
+        return true;
     }
     return false;
+}
+
+void updateChase()
+{
+    if (chase)
+    {
+        if (currentTick - flameStartTick[4] >= (chaseDuration*chasePosition))
+        {
+            flameStartTick[0 + chasePosition] = currentTick;
+            
+            chasePosition = chasePosition + 1;
+            if (chasePosition == chaseItems)
+            {
+                chase = false;
+                chasePosition = 0;
+            }
+        }
+    }
 }
 
 int32_t readHoldingRegister(uint16_t address)
@@ -817,6 +837,7 @@ void updateSnakes()
 void loop()
 {
     currentTick = millis();
+    updateChase();
     updateFlamethrowers();
     updateSnakes();
     updateEyes();
