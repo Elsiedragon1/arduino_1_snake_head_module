@@ -826,7 +826,6 @@ void updateSnakes()
                   registers[1] = 2;
                   registers[2] = 2;
                   break;
-                break;
             }
             lastMode = newMode;
         }
