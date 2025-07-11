@@ -19,10 +19,10 @@
 
 // Pin assignments
 //              bottom_jaw  tongues  flames
-// Snake 1      0           13          9
-// Snake 2      2           14          10
-// Snake 3      4           15          11
-// Snake 4      6           16          12
+// Snake 1      0           13          30
+// Snake 2      2           14          31
+// Snake 3      4           15          32
+// Snake 4      6           16          33
 
 #include <Wire.h>
 #include <Adafruit_PWMServoDriver.h>
@@ -185,19 +185,19 @@ void setup()
     // RS485 Enable / Disable
     pinMode(dePin, OUTPUT);
 
-    // initialise relay pins for the tongues
+    // initialise relay pins for the flames
     // I've changed this to initialise the flame pins too
-    for (int i = 9; i <= 12; i++) {
+    for (int i = 30; i <= 33; i++) {
         // set digital pins which trigger the relays to output mode
         pinMode(i, OUTPUT);
-        // set relay to open (tongues in) //flames off (hopefully)
+        // set relay to open //flames off
         digitalWrite(i, HIGH);
     }
-    //Initialise relay pins for the flames
+    //Initialise relay pins for the tongues
     for (int i = 13; i <= 16; i++) { //these are pin numbers
         // set digital pins which trigger the relays to output mode
         pinMode(i, OUTPUT);
-        // set relay to open //flames off 
+        // set relay to open (tongues in) //flames off (hopefully)
         digitalWrite(i, HIGH);
     }
 
@@ -777,21 +777,21 @@ void updateFlamethrowers()
                 //  LED OFF!
                 if (LowOn)
                 {
-                    digitalWrite(9+n, HIGH);
+                    digitalWrite(30+n, HIGH);
                 } 
                 else
                 {
-                    digitalWrite(9+n, LOW);
+                    digitalWrite(30+n, LOW);
                 }
             } else {
                 //  LED ON!
                 if (LowOn)
                 {
-                    digitalWrite(9+n, LOW);
+                    digitalWrite(30+n, LOW);
                 }
                 else
                 {
-                    digitalWrite(9+n, HIGH);
+                    digitalWrite(30+n, HIGH);
                 }
             }
         }
